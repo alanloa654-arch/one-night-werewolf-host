@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>一夜狼人殺 主持人</title>
+<style>
+:root {
+  --bg: #0f0f1a;
+  --card: #1a1a2e;
+  --accent: #e94560;
+  --accent2: #0f3460;
+  --text: #eee;
+  --muted: #aaa;
+  --good: #4caf50;
+  --wolf: #f44336;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 12px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 16px;
+  line-height: 1.5;
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100vh;
+}
+h1, h2 { margin: 0 0 12px; text-align: center; }
+button, .btn {
+  display: block;
+  width: 100%;
+  padding: 16px;
+  margin: 8px 0;
+  font-size: 18px;
+  font-weight: 600;
+  border: none;
+  border-radius: 12px;
+  background: var(--accent);
+  color: white;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+button:active { transform: scale(0.98); }
+button.secondary { background: var(--accent2); }
+button.good { background: var(--good); }
+button.danger { background: #555; }
+.card {
+  background: var(--card);
+  border-radius: 16px;
+  padding: 16px;
+  margin: 12px 0;
+}
+label { display: flex; align-items: center; margin: 8px 0; font-size: 16px; }
+input[type="number"], select {
+  width: 80px;
+  padding: 8px;
+  font-size: 16px;
+  border-radius: 8px;
+  border: 1px solid #444;
+  background: #222;
+  color: white;
+}
+.role-item { display: flex; justify-content: space-between; align-items: center; margin: 6px 0; }
+.timer {
+  font-size: 48px;
+  text-align: center;
+  font-weight: bold;
+  color: var(--accent);
+  margin: 12px 0;
+}
+.script {
+  font-size: 18px;
+  background: #222;
+  padding: 16px;
+  border-radius: 12px;
+  white-space: pre-line;
+  margin: 12px 0;
+}
+.hidden { display: none !important; }
+.assignment { font-size: 15px; }
+.assignment .wolf { color: var(--wolf); font-weight: bold; }
+.assignment .good { color: var(--good); }
+.center { text-align: center; }
+.small { font-size: 13px; color: var(--muted); }
+.progress { height: 6px; background: #333; border-radius: 3px; margin: 8px 0; }
+.progress-bar { height: 100%; background: var(--accent); border-radius: 3px; width: 0%; transition: width 0.3s; }
+</style>
+</head>
+<body>
+<div id="setup">
+  <h1>🌙 一夜狼人殺 主持人</h1>
+  <div class="card">
+    <label>玩家人數：<input type="number" id="playerCount" value="5" min="3" max="10"></label>
+    <div class="small">建議 4-7 人。總牌數 = 人數 + 3（中心牌）</div>
+  </div>
+  <div class="card">
+    <h2>選擇角色</h2>
+    <div id="roleSelectors"></div>
+    <div class="small" id="cardCountInfo"></div>
+  </div>
+  <div class="card">
+    <h2>📱 iOS 開啟方法</h2>
+    <div class="small">
+      1. 下載此檔案<br>
+      2. 打開「檔案」App<br>
+      3. 找到下載的 HTML 檔<br>
+      4. 點一下，然後按分享圖示 → 「在 Safari 中開啟」<br>
+      5. 如果語音沒有廣東話，請到「設定」→「輔助使用」→「朗讀內容」→「聲音」下載「廣東話」
+    </div>
+  </div>
+  <button onclick="generateGame()">🎲 隨機分配並開始</button>
+  <button class="secondary" onclick="loadPreset(5)">快速 5 人預設</button>
+  <button class="secondary" onclick="loadPreset(6)">快速 6 人預設</button>
+</div>
+
+<div id="game" class="hidden">
+  <div class="progress"><div class="progress-bar" id="progressBar"></div></div>
+  <div id="stepContent"></div>
+  <div id="navButtons"></div>
+</div>
+
+<div id="reveal" class="hidden">
+  <h2>最終揭曉</h2>
+  <div id="revealContent" class="card assignment"></div>
+  <div class="card">
+    <div class="small">注意：實際最終身份可能因盜賊／搞蛋鬼／酒鬼交換而改變。請根據玩家行動手動調整。</div>
+  </div>
+  <button onclick="restart()">重新開始</button>
+</div>
+
+<script>
+const ROLES = [
+  { id: 'wolf', name: '狼人', team: 'wolf', qtyDefault: 2, order: 1, wakes: true,
+    script: '狼人請睁眼，確認你的同伴。\n如果只有你一個人是狼人，你可以查看中心三張牌中的一張。\n\n（等待約 10 秒）\n\n狼人請閉眼。' },
+  { id: 'minion', name: '爪牙', team: 'wolf', qtyDefault: 0, order: 2, wakes: true,
+    script: '爪牙請睁眼。\n狼人請伸出大拇指讓爪牙看到你。\n\n（等待）\n\n狼人放下大拇指。爪牙請閉眼。' },
+  { id: 'mason', name: '守夜人', team: 'good', qtyDefault: 0, order: 3, wakes: true, note: '通常成對出現',
+    script: '守夜人請睁眼，尋找另一位守夜人。\n\n（等待）\n\n守夜人請閉眼。' },
+  { id: 'seer', name: '預言家', team: 'good', qtyDefault: 1, order: 4, wakes: true,
+    script: '預言家請睁眼。\n你可以查看一位玩家的牌，或中心兩張牌。\n\n（等待約 10 秒）\n\n預言家請閉眼。' },
+  { id: 'robber', name: '盜賊', team: 'good', qtyDefault: 1, order: 5, wakes: true,
+    script: '盜賊請睁眼。\n你可以與另一位玩家交換牌，然後查看你的新牌。\n\n（等待）\n\n盜賊請閉眼。' },
+  { id: 'troublemaker', name: '搞蛋鬼', team: 'good', qtyDefault: 1, order: 6, wakes: true,
+    script: '搞蛋鬼請睁眼。\n你可以交換另外兩位玩家的牌。\n\n（等待）\n\n搞蛋鬼請閉眼。' },
+  { id: 'drunk', name: '酒鬼', team: 'good', qtyDefault: 0, order: 7, wakes: true,
+    script: '酒鬼請睁眼。\n你必須與中心一張牌交換，且不能查看新牌。\n\n（等待）\n\n酒鬼請閉眼。' },
+  { id: 'insomniac', name: '失眠者', team: 'good', qtyDefault: 1, order: 8, wakes: true,
+    script: '失眠者請睁眼。\n查看你自己目前的牌。\n\n（等待）\n\n失眠者請閉眼。' },
+  { id: 'tanner', name: '皮匠', team: 'neutral', qtyDefault: 0, order: 9, wakes: false,
+    script: '' },
+  { id: 'hunter', name: '獵人', team: 'good', qtyDefault: 0, order: 10, wakes: false,
+    script: '' },
+  { id: 'villager', name: '村民', team: 'good', qtyDefault: 1, order: 11, wakes: false,
+    script: '' },
+];
+
+let gameState = {
+  players: 5,
+  roles: {},
+  assignment: [],
+  center: [],
+  steps: [],
+  currentStep: 0,
+  timerInterval: null
+};
+
+function initSelectors() {
+  const container = document.getElementById('roleSelectors');
+  container.innerHTML = '';
+  ROLES.forEach(r => {
+    const div = document.createElement('div');
+    div.className = 'role-item';
+    div.innerHTML = `
+      <label>${r.name} ${r.team === 'wolf' ? '🐺' : r.team === 'neutral' ? '🔨' : '👤'}</label>
+      <input type="number" id="qty_${r.id}" value="${r.qtyDefault}" min="0" max="4" onchange="updateCardCount()">
+    `;
+    container.appendChild(div);
+  });
+  updateCardCount();
+}
+
+function updateCardCount() {
+  const players = parseInt(document.getElementById('playerCount').value) || 5;
+  let total = 0;
+  ROLES.forEach(r => {
+    total += parseInt(document.getElementById('qty_' + r.id).value) || 0;
+  });
+  const needed = players + 3;
+  const info = document.getElementById('cardCountInfo');
+  info.textContent = `目前角色總數：${total}　|　需要：${needed}（玩家+3中心）`;
+  info.style.color = total === needed ? '#4caf50' : '#f44336';
+}
+
+function loadPreset(n) {
+  document.getElementById('playerCount').value = n;
+  const presets = {
+    5: { wolf:2, seer:1, robber:1, troublemaker:1, insomniac:1, villager:1 },
+    6: { wolf:2, seer:1, robber:1, troublemaker:1, drunk:1, insomniac:1, villager:1 }
+  };
+  const p = presets[n] || presets[5];
+  ROLES.forEach(r => {
+    document.getElementById('qty_' + r.id).value = p[r.id] || 0;
+  });
+  updateCardCount();
+}
+
+function generateGame() {
+  const players = parseInt(document.getElementById('playerCount').value);
+  const roleList = [];
+  ROLES.forEach(r => {
+    const qty = parseInt(document.getElementById('qty_' + r.id).value) || 0;
+    for (let i = 0; i < qty; i++) roleList.push({ ...r });
+  });
+  const needed = players + 3;
+  if (roleList.length !== needed) {
+    alert(`角色數量不對！目前 ${roleList.length} 張，需要 ${needed} 張。`);
+    return;
+  }
+  // Shuffle
+  for (let i = roleList.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [roleList[i], roleList[j]] = [roleList[j], roleList[i]];
+  }
+  gameState.players = players;
+  gameState.assignment = roleList.slice(0, players);
+  gameState.center = roleList.slice(players);
+  gameState.roles = {};
+  ROLES.forEach(r => {
+    gameState.roles[r.id] = parseInt(document.getElementById('qty_' + r.id).value) || 0;
+  });
+
+  // Build steps
+  gameState.steps = [];
+  gameState.steps.push({
+    title: '🌙 夜晚開始',
+    script: '所有人請閉眼。\n\n（確認所有人都閉眼後繼續）',
+    showAssignment: true
+  });
+  ROLES.filter(r => r.wakes && gameState.roles[r.id] > 0)
+       .sort((a,b) => a.order - b.order)
+       .forEach(r => {
+    gameState.steps.push({
+      title: r.name + ' 行動',
+      script: r.script,
+      roleId: r.id
+    });
+  });
+  gameState.steps.push({
+    title: '☀️ 天亮了',
+    script: '天亮了，所有人請睁眼！\n\n現在開始討論。\n（建議討論 3-5 分鐘）',
+    isDay: true
+  });
+  gameState.steps.push({
+    title: '🗳️ 投票',
+    script: '討論結束。\n請大家同時投票指出你認為是狼人的玩家。\n\n得票最高者出局。若狼人出局則村民勝利，否則狼人勝利。\n（皮匠若出局則皮匠單獨勝利）',
+    isVote: true
+  });
+
+  gameState.currentStep = 0;
+  document.getElementById('setup').classList.add('hidden');
+  document.getElementById('game').classList.remove('hidden');
+  showStep();
+}
+
+function speakText(text) {
+  if (!window.speechSynthesis) {
+    alert('你的瀏覽器不支援語音。請用 Safari 開啟，並確認已下載廣東話語音。');
+    return;
+  }
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text.replace(/\n/g, '。').replace(/（[^）]*）/g, ''));
+  utterance.lang = 'zh-HK';
+  utterance.rate = 0.9;
+  utterance.pitch = 1;
+  // Try to select a Cantonese voice if available
+  const voices = window.speechSynthesis.getVoices();
+  const cantonese = voices.find(v => v.lang === 'zh-HK' || v.lang.startsWith('yue') || v.name.includes('Cantonese') || v.name.includes('粵'));
+  if (cantonese) utterance.voice = cantonese;
+  window.speechSynthesis.speak(utterance);
+}
+
+function showStep() {
+  const step = gameState.steps[gameState.currentStep];
+  const total = gameState.steps.length;
+  document.getElementById('progressBar').style.width = ((gameState.currentStep + 1) / total * 100) + '%';
+
+  let html = `<h2>${step.title}</h2>`;
+  html += `<div class="script">${step.script}</div>`;
+
+  // Add play button for voice
+  if (step.script && step.script.trim()) {
+    html += `<button class="secondary" onclick="speakText(\`${step.script.replace(/`/g, '\\`')}\`)">🔊 播放廣東話配音</button>`;
+  }
+
+  if (step.showAssignment) {
+    html += '<div class="card assignment"><strong>身份分配（僅主持人看）：</strong><br>';
+    gameState.assignment.forEach((r, i) => {
+      const cls = r.team === 'wolf' ? 'wolf' : 'good';
+      html += `<span class="${cls}">玩家 ${i+1}：${r.name}</span><br>`;
+    });
+    html += '<br><strong>中心牌：</strong><br>';
+    gameState.center.forEach((r, i) => {
+      html += `中心 ${i+1}：${r.name}<br>`;
+    });
+    html += '</div>';
+  }
+
+  if (step.isDay) {
+    html += '<button onclick="startDiscussTimer()">開始 5 分鐘討論倒數</button>';
+    html += '<div class="timer" id="discussTimer"></div>';
+  }
+
+  document.getElementById('stepContent').innerHTML = html;
+
+  let nav = '';
+  if (gameState.currentStep > 0) {
+    nav += '<button class="secondary" onclick="prevStep()">← 上一步</button>';
+  }
+  if (gameState.currentStep < gameState.steps.length - 1) {
+    nav += '<button onclick="nextStep()">下一步 →</button>';
+  } else {
+    nav += '<button class="good" onclick="showReveal()">揭曉所有身份</button>';
+  }
+  document.getElementById('navButtons').innerHTML = nav;
+}
+
+function nextStep() { if (gameState.currentStep < gameState.steps.length - 1) { gameState.currentStep++; showStep(); } }
+function prevStep() { if (gameState.currentStep > 0) { gameState.currentStep--; showStep(); } }
+
+function startDiscussTimer() {
+  let sec = 300;
+  const el = document.getElementById('discussTimer');
+  if (gameState.timerInterval) clearInterval(gameState.timerInterval);
+  gameState.timerInterval = setInterval(() => {
+    sec--;
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    el.textContent = `${m}:${s.toString().padStart(2,'0')}`;
+    if (sec <= 0) {
+      clearInterval(gameState.timerInterval);
+      el.textContent = '時間到！請投票';
+    }
+  }, 1000);
+  el.textContent = '5:00';
+}
+
+function showReveal() {
+  document.getElementById('game').classList.add('hidden');
+  document.getElementById('reveal').classList.remove('hidden');
+  let html = '<strong>初始分配：</strong><br>';
+  gameState.assignment.forEach((r, i) => {
+    const cls = r.team === 'wolf' ? 'wolf' : r.team === 'neutral' ? '' : 'good';
+    html += `<span class="${cls}">玩家 ${i+1}：${r.name}</span><br>`;
+  });
+  html += '<br><strong>中心牌：</strong><br>';
+  gameState.center.forEach((r, i) => {
+    html += `中心 ${i+1}：${r.name}<br>`;
+  });
+  document.getElementById('revealContent').innerHTML = html;
+}
+
+function restart() {
+  document.getElementById('reveal').classList.add('hidden');
+  document.getElementById('setup').classList.remove('hidden');
+  if (gameState.timerInterval) clearInterval(gameState.timerInterval);
+}
+
+// Init
+initSelectors();
+document.getElementById('playerCount').addEventListener('input', updateCardCount);
+</script>
+</body>
+</html>
