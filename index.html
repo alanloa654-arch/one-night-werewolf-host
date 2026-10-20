@@ -197,8 +197,8 @@ function updateCardCount() {
 function loadPreset(n) {
   document.getElementById('playerCount').value = n;
   const presets = {
-    5: { wolf:2, seer:1, robber:1, troublemaker:1, insomniac:1, villager:1 },
-    6: { wolf:2, seer:1, robber:1, troublemaker:1, drunk:1, insomniac:1, villager:1 }
+    5: { wolf:2, seer:1, robber:1, troublemaker:1, insomniac:1, villager:2 },
+    6: { wolf:2, seer:1, robber:1, troublemaker:1, drunk:1, insomniac:1, villager:2 }
   };
   const p = presets[n] || presets[5];
   ROLES.forEach(r => {
