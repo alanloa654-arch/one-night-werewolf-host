@@ -164,8 +164,16 @@ let gameState = {
   center: [],
   steps: [],
   currentStep: 0,
-  timerInterval: null
+  timerInterval: null,
+  autoTimer: null
 };
+
+function clearAutoTimer() {
+  if (gameState.autoTimer) {
+    clearTimeout(gameState.autoTimer);
+    gameState.autoTimer = null;
+  }
+}
 
 function initSelectors() {
   const container = document.getElementById('roleSelectors');
@@ -219,7 +227,6 @@ function generateGame() {
     alert(`角色數量不對！目前 ${roleList.length} 張，需要 ${needed} 張。`);
     return;
   }
-  // Shuffle
   for (let i = roleList.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [roleList[i], roleList[j]] = [roleList[j], roleList[i]];
@@ -232,7 +239,6 @@ function generateGame() {
     gameState.roles[r.id] = parseInt(document.getElementById('qty_' + r.id).value) || 0;
   });
 
-  // Build steps
   gameState.steps = [];
   gameState.steps.push({
     title: '🌙 夜晚開始',
@@ -282,6 +288,7 @@ function speakText(text) {
 }
 
 function showStep() {
+  clearAutoTimer();
   const step = gameState.steps[gameState.currentStep];
   const total = gameState.steps.length;
   document.getElementById('progressBar').style.width = ((gameState.currentStep + 1) / total * 100) + '%';
@@ -313,9 +320,15 @@ function showStep() {
 
   document.getElementById('stepContent').innerHTML = html;
 
-  // Auto speak
   if (step.script && step.script.trim()) {
     setTimeout(() => speakText(step.script), 400);
+  }
+
+  const isNightStep = !step.isDay && !step.isVote && gameState.currentStep < gameState.steps.length - 1;
+  if (isNightStep) {
+    gameState.autoTimer = setTimeout(() => {
+      nextStep();
+    }, 12000);
   }
 
   let nav = '';
@@ -330,8 +343,20 @@ function showStep() {
   document.getElementById('navButtons').innerHTML = nav;
 }
 
-function nextStep() { if (gameState.currentStep < gameState.steps.length - 1) { gameState.currentStep++; showStep(); } }
-function prevStep() { if (gameState.currentStep > 0) { gameState.currentStep--; showStep(); } }
+function nextStep() { 
+  clearAutoTimer();
+  if (gameState.currentStep < gameState.steps.length - 1) { 
+    gameState.currentStep++; 
+    showStep(); 
+  } 
+}
+function prevStep() { 
+  clearAutoTimer();
+  if (gameState.currentStep > 0) { 
+    gameState.currentStep--; 
+    showStep(); 
+  } 
+}
 
 function startDiscussTimer() {
   let sec = 300;
@@ -366,12 +391,12 @@ function showReveal() {
 }
 
 function restart() {
+  clearAutoTimer();
   document.getElementById('reveal').classList.add('hidden');
   document.getElementById('setup').classList.remove('hidden');
   if (gameState.timerInterval) clearInterval(gameState.timerInterval);
 }
 
-// Init
 initSelectors();
 document.getElementById('playerCount').addEventListener('input', updateCardCount);
 </script>
