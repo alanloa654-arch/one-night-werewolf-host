@@ -87,6 +87,13 @@ input[type="number"], select {
 .small { font-size: 13px; color: var(--muted); }
 .progress { height: 6px; background: #333; border-radius: 3px; margin: 8px 0; }
 .progress-bar { height: 100%; background: var(--accent); border-radius: 3px; width: 0%; transition: width 0.3s; }
+.auto-count {
+  font-size: 22px;
+  text-align: center;
+  color: #ff9800;
+  margin: 8px 0;
+  font-weight: bold;
+}
 </style>
 </head>
 <body>
@@ -165,13 +172,18 @@ let gameState = {
   steps: [],
   currentStep: 0,
   timerInterval: null,
-  autoTimer: null
+  autoTimer: null,
+  countdownInterval: null
 };
 
 function clearAutoTimer() {
   if (gameState.autoTimer) {
     clearTimeout(gameState.autoTimer);
     gameState.autoTimer = null;
+  }
+  if (gameState.countdownInterval) {
+    clearInterval(gameState.countdownInterval);
+    gameState.countdownInterval = null;
   }
 }
 
@@ -326,6 +338,18 @@ function showStep() {
 
   const isNightStep = !step.isDay && !step.isVote && gameState.currentStep < gameState.steps.length - 1;
   if (isNightStep) {
+    let remain = 12;
+    const cd = document.createElement('div');
+    cd.className = 'auto-count';
+    cd.textContent = `自動下一步：${remain} 秒`;
+    document.getElementById('stepContent').appendChild(cd);
+
+    gameState.countdownInterval = setInterval(() => {
+      remain--;
+      if (cd) cd.textContent = `自動下一步：${remain} 秒`;
+      if (remain <= 0) clearInterval(gameState.countdownInterval);
+    }, 1000);
+
     gameState.autoTimer = setTimeout(() => {
       nextStep();
     }, 12000);
