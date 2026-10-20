@@ -275,7 +275,6 @@ function speakText(text) {
   utterance.lang = 'zh-HK';
   utterance.rate = 0.9;
   utterance.pitch = 1;
-  // Try to select a Cantonese voice if available
   const voices = window.speechSynthesis.getVoices();
   const cantonese = voices.find(v => v.lang === 'zh-HK' || v.lang.startsWith('yue') || v.name.includes('Cantonese') || v.name.includes('粵'));
   if (cantonese) utterance.voice = cantonese;
@@ -290,9 +289,8 @@ function showStep() {
   let html = `<h2>${step.title}</h2>`;
   html += `<div class="script">${step.script}</div>`;
 
-  // Add play button for voice
   if (step.script && step.script.trim()) {
-    html += `<button class="secondary" onclick="speakText(\`${step.script.replace(/`/g, '\\`')}\`)">🔊 播放廣東話配音</button>`;
+    html += `<button class="secondary" onclick="speakText(\`${step.script.replace(/`/g, '\\`')}\`)">🔊 再播一次</button>`;
   }
 
   if (step.showAssignment) {
@@ -314,6 +312,11 @@ function showStep() {
   }
 
   document.getElementById('stepContent').innerHTML = html;
+
+  // Auto speak
+  if (step.script && step.script.trim()) {
+    setTimeout(() => speakText(step.script), 400);
+  }
 
   let nav = '';
   if (gameState.currentStep > 0) {
