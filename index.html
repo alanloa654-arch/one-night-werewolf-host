@@ -289,12 +289,15 @@ function speakText(text) {
     return;
   }
   window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text.replace(/\n/g, '。').replace(/（[^）]*）/g, ''));
+  const clean = text.replace(/\n/g, '。').replace(/（[^）]*）/g, '').replace(/\s+/g, ' ').trim();
+  const utterance = new SpeechSynthesisUtterance(clean);
   utterance.lang = 'zh-HK';
-  utterance.rate = 0.9;
-  utterance.pitch = 1;
+  utterance.rate = 1.2;          // faster, more natural
+  utterance.pitch = 1.05;        // slightly higher for liveliness
   const voices = window.speechSynthesis.getVoices();
-  const cantonese = voices.find(v => v.lang === 'zh-HK' || v.lang.startsWith('yue') || v.name.includes('Cantonese') || v.name.includes('粵'));
+  // Prefer the best Cantonese voice
+  const cantonese = voices.find(v => v.lang === 'zh-HK') 
+                 || voices.find(v => v.lang.startsWith('yue') || v.name.includes('Cantonese') || v.name.includes('粵') || v.name.includes('Hong Kong'));
   if (cantonese) utterance.voice = cantonese;
   window.speechSynthesis.speak(utterance);
 }
@@ -333,7 +336,7 @@ function showStep() {
   document.getElementById('stepContent').innerHTML = html;
 
   if (step.script && step.script.trim()) {
-    setTimeout(() => speakText(step.script), 400);
+    setTimeout(() => speakText(step.script), 300);
   }
 
   const isNightStep = !step.isDay && !step.isVote && gameState.currentStep < gameState.steps.length - 1;
